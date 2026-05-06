@@ -1,31 +1,33 @@
-# main.py
+# main.py - Pydantic v1 Compatible
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator  # v1 import
 from curl_cffi import requests as curl_requests
 import urllib.parse
-import os
 import logging
 
-# ✅ Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BTS API Proxy", version="1.0")
-
 BASE_URL = "https://bridgetosuccess.learncentre.tech/public/study_api_sprint13_security_promo/"
 
-# ✅ Request model
+# ✅ Pydantic v1 Model
 class APICall(BaseModel):
-    tag: str = Field(..., pattern="^(allCourses|getCategoryMixed)$")
+    tag: str = Field(..., regex="^(allCourses|getCategoryMixed)$")
     userId: str = "13247"
     isEBook: int = 0
     courseId: str = None
     categoryId: str = None
-    # Optional: override headers
     brand: str = None
     model: str = None
+    
+    # ✅ Pydantic v1 validator syntax
+    @validator('tag')
+    def tag_must_be_valid(cls, v):
+        if v not in ["allCourses", "getCategoryMixed"]:
+            raise ValueError('tag must be allCourses or getCategoryMixed')
+        return v
 
-# ✅ Headers builder
 def get_headers(brand="vivo", model="V2339A"):
     return {
         "Accept": "*/*",
@@ -48,7 +50,7 @@ def get_headers(brand="vivo", model="V2339A"):
 @app.post("/proxy")
 async def proxy(req: APICall, request: Request):
     try:
-        # ✅ Build form-encoded body
+        # Build form body
         params = {k: v for k, v in req.dict(exclude_none=True).items() 
                   if k not in ["brand", "model"]}
         body_parts = [f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params.items()]
@@ -56,23 +58,22 @@ async def proxy(req: APICall, request: Request):
         
         logger.info(f"[Proxy] tag={req.tag} | body={body[:100]}")
         
-        # ✅ Headers with optional override
         headers = get_headers(
             brand=req.brand or "vivo",
             model=req.model or "V2339A"
         )
         
-        # ✅ curl_cffi call with Chrome impersonation
+        # ✅ curl_cffi with Chrome impersonation
         resp = curl_requests.post(
             BASE_URL,
             data=body,
             headers=headers,
-            impersonate="chrome120",  # 🎭 TLS fingerprint bypass
+            impersonate="chrome120",
             timeout=30,
             allow_redirects=True
         )
         
-        # ✅ Check for Cloudflare block
+        # Cloudflare check
         if "just a moment" in resp.text.lower() or "cf-browser" in resp.text.lower():
             logger.warning("🚫 Cloudflare protection detected")
             raise HTTPException(
@@ -80,7 +81,6 @@ async def proxy(req: APICall, request: Request):
                 detail={"success": 0, "error": 1, "error_msg": "Cloudflare blocked request"}
             )
         
-        # ✅ Return exact upstream response
         return resp.json()
         
     except HTTPException:
@@ -96,7 +96,7 @@ async def proxy(req: APICall, request: Request):
 async def health():
     return {"status": "ok", "service": "bts-proxy"}
 
-# ✅ CORS middleware (optional)
+# CORS
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
