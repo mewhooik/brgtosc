@@ -1,6 +1,6 @@
-# requirements.txt - Render Compatible ✅
-fastapi==0.115.0
-uvicorn==0.32.0
-curl_cffi==0.7.4
-pydantic==2.9.2
-httpx==0.27.2
+# requirements.txt - Python 3.11 Compatible ✅
+fastapi==0.109.2
+uvicorn==0.27.1
+curl_cffi==0.6.2
+pydantic==1.10.13
+httpx==0.26.0
