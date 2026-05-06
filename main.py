@@ -1,6 +1,6 @@
-# main.py - Pydantic v1 Compatible
+# main.py - Pydantic v2 Compatible ✅
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field, validator  # v1 import
+from pydantic import BaseModel, Field, field_validator  # v2 import
 from curl_cffi import requests as curl_requests
 import urllib.parse
 import logging
@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="BTS API Proxy", version="1.0")
 BASE_URL = "https://bridgetosuccess.learncentre.tech/public/study_api_sprint13_security_promo/"
 
-# ✅ Pydantic v1 Model
+# ✅ Pydantic v2 Model
 class APICall(BaseModel):
-    tag: str = Field(..., regex="^(allCourses|getCategoryMixed)$")
+    tag: str = Field(..., pattern="^(allCourses|getCategoryMixed)$")
     userId: str = "13247"
     isEBook: int = 0
     courseId: str = None
@@ -21,8 +21,9 @@ class APICall(BaseModel):
     brand: str = None
     model: str = None
     
-    # ✅ Pydantic v1 validator syntax
-    @validator('tag')
+    # ✅ Pydantic v2 validator syntax
+    @field_validator('tag')
+    @classmethod
     def tag_must_be_valid(cls, v):
         if v not in ["allCourses", "getCategoryMixed"]:
             raise ValueError('tag must be allCourses or getCategoryMixed')
@@ -50,8 +51,8 @@ def get_headers(brand="vivo", model="V2339A"):
 @app.post("/proxy")
 async def proxy(req: APICall, request: Request):
     try:
-        # Build form body
-        params = {k: v for k, v in req.dict(exclude_none=True).items() 
+        # Build form body (exclude None values)
+        params = {k: v for k, v in req.model_dump(exclude_none=True).items() 
                   if k not in ["brand", "model"]}
         body_parts = [f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params.items()]
         body = "&".join(body_parts)
